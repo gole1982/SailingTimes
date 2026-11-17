@@ -1,0 +1,11 @@
+# 验证与截图产物（本地生成）
+.verify/
+
+# 本地工作记录
+.workbuddy/
+
+# 依赖与系统文件
+node_modules/
+Thumbs.db
+.DS_Store
+desktop.ini

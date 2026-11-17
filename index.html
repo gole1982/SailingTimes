@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>大航海时代 · 逐年海图 | Age of Discovery Atlas</title>
+<style>
+:root{
+  --bg:#050b14; --panel:rgba(8,20,34,.86); --panel-solid:#0b1b2c;
+  --line:rgba(205,171,110,.22); --line-strong:rgba(205,171,110,.46);
+  --gold:#d8b26a; --gold-dim:#9d8352; --ink:#ece3cf;
+  --muted:#8b9eaf; --muted2:#62768a; --teal:#5fd0c8; --accent:#d8b26a;
+  --font-serif:'Georgia','Songti SC','STSong','Noto Serif CJK SC','SimSun',serif;
+  --font-sans:'PingFang SC','Microsoft YaHei','Hiragino Sans GB',system-ui,-apple-system,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--font-sans)}
+body{-webkit-font-smoothing:antialiased}
+#scene{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:0}
+#vignette{position:fixed;inset:0;z-index:1;pointer-events:none;
+  background:radial-gradient(ellipse 74% 70% at 50% 48%,transparent 40%,rgba(2,6,12,.5) 88%,rgba(2,6,12,.86) 100%)}
+#labels,#shipTags{position:fixed;inset:0;z-index:2;pointer-events:none;overflow:hidden}
+#shipTags{z-index:6}
+
+.frame{position:fixed;inset:0;z-index:4;pointer-events:none;display:grid;
+  grid-template-columns:266px minmax(0,1fr) 320px;grid-template-rows:auto minmax(0,1fr) auto}
+.frame>*{pointer-events:auto}
+
+/* ---------- header ---------- */
+.topbar{grid-column:1/4;grid-row:1;display:flex;align-items:flex-start;justify-content:space-between;
+  padding:20px 28px 0;gap:20px;background:linear-gradient(180deg,rgba(4,10,18,.96) 0%,rgba(4,10,18,.7) 60%,transparent);pointer-events:none}
+.brand{display:flex;align-items:center;gap:13px}
+.brand-mark{width:36px;height:36px;flex:none;border:1px solid var(--line-strong);border-radius:50%;
+  display:grid;place-items:center;color:var(--gold);font-size:18px;box-shadow:0 0 22px rgba(216,178,106,.12) inset}
+.brand h1{font-family:var(--font-serif);font-size:22px;font-weight:500;letter-spacing:.15em;line-height:1.2}
+.brand h1 em{font-style:normal;color:var(--gold)}
+.brand .sub{font-size:9.5px;letter-spacing:.24em;color:var(--muted2);text-transform:uppercase;margin-top:5px}
+.topmeta{text-align:right;font-size:10.5px;color:var(--muted);letter-spacing:.08em;line-height:1.85}
+.topmeta .yr{font-family:var(--font-serif);font-size:30px;color:var(--gold);letter-spacing:.06em;line-height:1.1;display:block}
+.topmeta .disc{color:var(--muted2);font-size:9.5px;letter-spacing:.02em}
+
+/* ---------- panels ---------- */
+.left{grid-column:1;grid-row:2;align-self:start;max-height:calc(100vh - 205px);overflow-y:auto;
+  padding:22px 0 0 28px;scrollbar-width:thin;scrollbar-color:rgba(205,171,110,.3) transparent}
+.left::-webkit-scrollbar{width:4px}.left::-webkit-scrollbar-thumb{background:rgba(205,171,110,.3)}
+.right{grid-column:3;grid-row:2;align-self:start;max-height:calc(100vh - 205px);overflow-y:auto;
+  margin:22px 28px 0 0;scrollbar-width:thin;scrollbar-color:rgba(205,171,110,.3) transparent}
+.right::-webkit-scrollbar{width:4px}.right::-webkit-scrollbar-thumb{background:rgba(205,171,110,.3)}
+.panel-label{font-size:9.5px;letter-spacing:.28em;color:var(--gold-dim);text-transform:uppercase;
+  display:flex;align-items:center;gap:9px;margin:0 0 10px}
+.panel-label:after{content:"";height:1px;flex:1;background:linear-gradient(90deg,var(--line),transparent)}
+.card{background:var(--panel);border:1px solid var(--line);backdrop-filter:blur(12px);padding:11px 12px;margin-bottom:10px}
+
+.era{display:block;width:100%;text-align:left;border:1px solid rgba(205,171,110,.12);
+  background:rgba(9,21,36,.6);color:inherit;font-family:inherit;padding:6px 9px;margin-bottom:4px;
+  cursor:pointer;transition:.2s}
+.era:hover{background:rgba(16,34,53,.86);border-color:rgba(205,171,110,.34)}
+.era.on{background:linear-gradient(90deg,rgba(216,178,106,.16),rgba(9,21,36,.8));border-color:var(--line-strong)}
+.era .no{font-size:9px;color:var(--gold-dim);letter-spacing:.18em}
+.era .nm{display:block;font-family:var(--font-serif);font-size:12px;margin-top:1px;line-height:1.35}
+.era .rg{display:block;font-size:9px;color:var(--muted2);margin-top:2px;letter-spacing:.06em}
+
+.fleet{display:grid;gap:5px}
+.fl{display:grid;grid-template-columns:10px 1fr auto;gap:8px;align-items:center;
+  padding:5px 6px;background:rgba(9,21,36,.55);border:1px solid rgba(205,171,110,.10);
+  border-left:2px solid var(--c);cursor:pointer;transition:.2s}
+.fl:hover{background:rgba(18,36,54,.9);border-color:rgba(205,171,110,.3)}
+.fl.off{opacity:.36}
+.fl.past{opacity:.62;background:transparent}
+.fl .dot{width:8px;height:8px;border-radius:50%;background:var(--c);box-shadow:0 0 8px var(--c)}
+.fl .nm{font-size:11px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fl .nm small{display:block;color:var(--muted2);font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fl .eye{font-size:10px;color:var(--muted2);border:1px solid rgba(205,171,110,.18);
+  width:19px;height:19px;display:grid;place-items:center;cursor:pointer}
+.fl .eye:hover{color:var(--gold);border-color:var(--line-strong)}
+.fleet-empty{font-size:10.5px;color:var(--muted2);line-height:1.8;padding:6px 2px}
+
+.kicker{font-size:9.5px;letter-spacing:.26em;color:var(--gold-dim);text-transform:uppercase}
+.bigyr{font-family:var(--font-serif);font-size:38px;color:var(--gold);line-height:1.1;margin:6px 0 2px}
+.eraname{font-family:var(--font-serif);font-size:15px;color:var(--ink);letter-spacing:.05em}
+.erach{font-size:10px;color:var(--muted2);letter-spacing:.08em;margin-top:5px;line-height:1.6}
+.eranote{font-size:10.5px;color:#b9c6d0;line-height:1.8;margin-top:9px;padding-top:9px;border-top:1px solid var(--line)}
+.sec-t{font-size:9.5px;letter-spacing:.24em;color:var(--gold-dim);text-transform:uppercase;margin:16px 0 8px;
+  display:flex;align-items:center;gap:8px}
+.sec-t:after{content:"";height:1px;flex:1;background:var(--line)}
+.reveal{display:grid;gap:6px}
+.reveal .rv{font-size:10.5px;line-height:1.6;padding-left:12px;position:relative;color:#cdd8de}
+.reveal .rv:before{content:"◈";position:absolute;left:0;color:var(--gold);font-size:9px}
+.reveal .rv i{display:block;font-style:normal;color:var(--muted2);font-size:9.5px;margin-top:2px}
+.reveal .none{font-size:10.5px;color:var(--muted2);line-height:1.7}
+.fogbar{height:5px;background:rgba(205,171,110,.13);margin-top:9px;position:relative}
+.fogbar>i{display:block;height:100%;background:linear-gradient(90deg,#3d6b7a,var(--gold));transition:width .3s}
+.fogbar-lb{display:flex;justify-content:space-between;font-size:9px;color:var(--muted2);margin-top:5px}
+.caveat{font-size:10px;line-height:1.85;color:#a9b7c2;padding:9px 10px;background:rgba(216,178,106,.055);
+  border-left:2px solid var(--gold-dim)}
+.caveat b{color:var(--gold-dim);font-weight:500}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chips span{font-size:9.5px;color:var(--muted);border:1px solid rgba(205,171,110,.18);padding:3px 6px}
+.corr{display:grid;gap:7px}
+.corr p{font-size:10px;line-height:1.7;color:#b9c6d0;padding-left:13px;position:relative}
+.corr p:before{content:"✕";position:absolute;left:0;top:1px;color:#d08a72;font-size:9px}
+.corr-more{width:100%;margin-top:10px}
+
+/* ---------- ship tags / hover cards ---------- */
+.shiptag{position:absolute;transform:translate(-14px,-50%);pointer-events:auto;display:none;
+  align-items:center;gap:7px;padding:4px 9px 4px 5px;background:rgba(6,15,26,.9);
+  border:1px solid var(--c);border-left-width:3px;border-radius:3px;cursor:pointer;
+  box-shadow:0 3px 18px rgba(0,0,0,.6);white-space:nowrap;z-index:7}
+.shiptag.show{display:flex}
+.shiptag.focus{box-shadow:0 0 0 1px var(--c),0 0 22px rgba(216,178,106,.35)}
+.st-ico{width:20px;height:20px;color:var(--c);display:grid;place-items:center;flex:none}
+.st-ico svg{width:18px;height:18px}
+.st-txt b{display:block;font-size:10.5px;color:var(--ink);letter-spacing:.04em;font-weight:500}
+.st-txt small{display:block;font-size:8.5px;color:var(--muted);margin-top:1px;max-width:168px;
+  overflow:hidden;text-overflow:ellipsis}
+.hcard{display:none;position:absolute;left:100%;top:-12px;margin-left:10px;width:290px;
+  padding:14px 15px;background:rgba(7,16,28,.97);border:1px solid var(--line-strong);
+  box-shadow:0 10px 40px rgba(0,0,0,.8);white-space:normal;z-index:20;cursor:default}
+.shiptag:hover .hcard,.shiptag:focus-within .hcard{display:block}
+.shiptag.flip .hcard{left:auto;right:100%;margin-left:0;margin-right:10px}
+#hoverCard{position:fixed;z-index:9;width:290px;padding:14px 15px;background:rgba(7,16,28,.97);
+  border:1px solid var(--line-strong);box-shadow:0 10px 40px rgba(0,0,0,.8);
+  pointer-events:none;display:none;white-space:normal}
+#hoverCard.show{display:block}
+.hc-head{display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line);padding-bottom:9px}
+.hc-head .hc-bar{width:4px;height:22px;flex:none}
+.hc-head b{font-family:var(--font-serif);font-size:15px;font-weight:500}
+.hc-head small{color:var(--muted2);font-size:9.5px;margin-left:auto;text-align:right}
+.hc-meta{font-size:9.5px;color:var(--gold-dim);letter-spacing:.06em;margin-top:8px}
+.hc-sec{font-size:9px;letter-spacing:.22em;color:var(--gold-dim);text-transform:uppercase;margin:12px 0 5px}
+.hc-txt{font-size:10.5px;line-height:1.8;color:#cbd6de}
+.hc-txt em{font-style:normal;color:var(--gold)}
+.hc-list{list-style:none;display:grid;gap:4px}
+.hc-list li{font-size:10.5px;line-height:1.65;color:#cbd6de;padding-left:12px;position:relative}
+.hc-list li:before{content:"·";position:absolute;left:2px;color:var(--gold)}
+.hc-caveat{font-size:9.5px;line-height:1.7;color:#b09c78;margin-top:11px;padding:7px 8px;
+  background:rgba(216,178,106,.06);border-left:2px solid var(--gold-dim)}
+.hc-src{display:grid;gap:4px;margin-top:10px;padding-top:9px;border-top:1px solid var(--line)}
+.hc-src a{font-size:9.5px;color:var(--teal);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hc-src a:hover{color:#a5f0e9}
+
+/* ---------- bottom timeline ---------- */
+.bottom{grid-column:1/4;grid-row:3;padding:0 28px 20px;background:linear-gradient(0deg,rgba(4,10,18,.94),transparent)}
+.ctrl-wrap{background:var(--panel);border:1px solid var(--line);backdrop-filter:blur(14px);padding:12px 16px 11px}
+.ctrl-top{display:flex;align-items:center;gap:9px;margin-bottom:10px;flex-wrap:wrap}
+.btn{width:34px;height:34px;border:1px solid var(--line-strong);background:rgba(216,178,106,.06);
+  color:var(--gold);cursor:pointer;display:grid;place-items:center;font-size:13px;transition:.2s;font-family:inherit}
+.btn:hover{background:rgba(216,178,106,.2)}
+.btn.primary{width:40px;height:40px}
+.btn svg{width:15px;height:15px;fill:currentColor}
+.toggle{font-size:9.5px;letter-spacing:.1em;color:var(--muted);border:1px solid rgba(205,171,110,.18);
+  background:transparent;padding:8px 10px;cursor:pointer;white-space:nowrap;font-family:inherit;transition:.2s}
+.toggle:hover{border-color:var(--line-strong);color:var(--ink)}
+.toggle.on{background:rgba(216,178,106,.16);border-color:var(--line-strong);color:var(--gold)}
+.seg{display:flex;border:1px solid rgba(205,171,110,.22)}
+.seg button{font-size:9.5px;letter-spacing:.06em;color:var(--muted);background:transparent;border:0;
+  border-right:1px solid rgba(205,171,110,.14);padding:8px 9px;cursor:pointer;font-family:inherit;transition:.2s;white-space:nowrap}
+.seg button:last-child{border-right:0}
+.seg button:hover{color:var(--ink);background:rgba(216,178,106,.08)}
+.seg button.on{background:rgba(216,178,106,.2);color:var(--gold)}
+.seg-lb{font-size:9px;letter-spacing:.2em;color:var(--gold-dim);align-self:center;margin-right:2px}
+select.sel{-webkit-appearance:none;appearance:none;background:rgba(9,21,36,.94);color:var(--gold);
+  border:1px solid rgba(205,171,110,.34);font-family:inherit;font-size:10px;padding:7px 6px;letter-spacing:.08em;cursor:pointer}
+.tl-now small{display:block;font-size:9px;color:var(--muted2);letter-spacing:.14em;text-align:right}
+.fl .nm small.lead{color:#c9d4dd}
+.fl .nm small.goal{color:#9fb0bd}
+.fl .nm small.force{color:var(--gold-dim)}
+.leg{display:grid;gap:4px}
+.leg .lg{display:flex;align-items:center;gap:7px;font-size:10px;color:#bccbd6;line-height:1.4}
+.leg .lg i{width:13px;height:3px;flex:none;border-radius:2px}
+.leg .lg i.dot{width:8px;height:8px;border-radius:50%}
+.leg .lg b{font-weight:400;color:var(--ink)}
+.leg .lg em{font-style:normal;color:var(--muted2);font-size:9px;margin-left:auto;white-space:nowrap}
+.leg-note{font-size:9.5px;color:var(--muted2);line-height:1.7;margin-top:7px}
+.wstate{font-size:10.5px;line-height:1.75;color:#c6d3dc}
+.wstate b{color:var(--gold);font-weight:500}
+.ctrl-divider{width:1px;height:24px;background:var(--line);margin:0 2px}
+.tl-now{margin-left:auto;font-family:var(--font-serif);font-size:20px;color:var(--gold);letter-spacing:.08em}
+.tl-now span{font-size:10px;color:var(--muted2);font-family:var(--font-sans);letter-spacing:.1em;margin-left:8px}
+.track{position:relative;height:34px;cursor:pointer}
+.track .rail{position:absolute;left:0;right:0;top:14px;height:2px;background:rgba(205,171,110,.2)}
+.track .fill{position:absolute;left:0;top:14px;height:2px;background:linear-gradient(90deg,var(--gold-dim),var(--gold));
+  box-shadow:0 0 10px rgba(216,178,106,.5);pointer-events:none}
+.track .spanbar{position:absolute;height:3px;opacity:.42;pointer-events:none;border-radius:2px}
+.track .spanbar.live{opacity:1;box-shadow:0 0 8px currentColor}
+.track .chap{position:absolute;top:19px;width:1px;height:7px;background:rgba(205,171,110,.4);pointer-events:auto}
+.track .chap.major{height:11px;top:17px;background:rgba(216,178,106,.8)}
+.track .yr-tick{position:absolute;top:22px;font-size:8.5px;color:var(--muted2);transform:translateX(-50%);pointer-events:none}
+.track .knob{position:absolute;top:8px;width:14px;height:14px;margin-left:-7px;border-radius:50%;
+  background:var(--ink);border:2px solid var(--gold);box-shadow:0 0 14px rgba(216,178,106,.85);pointer-events:none}
+.tl-foot{display:flex;justify-content:space-between;gap:14px;margin-top:4px;font-size:9.5px;color:var(--muted2);letter-spacing:.06em}
+.tl-foot kbd{border:1px solid rgba(205,171,110,.28);padding:1px 4px;font-family:inherit;font-size:9px}
+
+/* ---------- 3d place labels ---------- */
+.lab{position:absolute;transform:translate(-50%,-50%);white-space:nowrap;font-size:9.5px;letter-spacing:.04em;
+  color:#cfdae2;text-shadow:0 1px 6px #000,0 0 14px #000;padding:3px 7px;
+  background:rgba(5,13,23,.7);border:1px solid rgba(205,171,110,.24);border-radius:2px;
+  opacity:0;transition:opacity .3s;pointer-events:none}
+.lab.show{opacity:1}
+.lab.key{color:var(--gold);border-color:rgba(216,178,106,.45)}
+.lab .sm{display:block;font-size:8px;color:var(--muted2);letter-spacing:.08em;margin-top:2px}
+
+#boot{position:fixed;inset:0;z-index:30;background:var(--bg);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;padding:0 40px;text-align:center;
+  transition:opacity .7s;font-family:var(--font-serif);letter-spacing:.18em;color:var(--gold);font-size:13px;
+  line-height:1.9}
+#boot.hide{opacity:0;pointer-events:none}
+#boot:after{content:"";display:block;width:132px;height:2px;margin-top:16px;
+  background:linear-gradient(90deg,transparent,var(--gold),transparent);
+  animation:bootPulse 1.25s ease-in-out infinite}
+@keyframes bootPulse{0%,100%{opacity:.12;transform:scaleX(.55)}50%{opacity:.85;transform:scaleX(1)}}
+#toast{position:fixed;left:50%;bottom:150px;transform:translateX(-50%);z-index:12;
+  padding:8px 16px;background:rgba(9,21,36,.94);border:1px solid var(--line-strong);
+  color:var(--gold);font-size:10.5px;letter-spacing:.08em;opacity:0;transition:opacity .35s;pointer-events:none}
+#toast.show{opacity:1}
+
+@media (max-width:1200px){
+  .frame{grid-template-columns:220px minmax(0,1fr) 280px}
+  .left{padding-left:16px}.right{margin-right:16px}.topbar{padding-left:16px;padding-right:16px}.bottom{padding-left:16px;padding-right:16px}
+  .brand h1{font-size:19px}
+}
+@media (max-width:900px){
+  .frame{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr) auto}
+  .left{grid-column:1;grid-row:2;align-self:start;max-height:38vh;padding:10px 12px 0}
+  .right{grid-column:1;grid-row:2;align-self:end;margin:0 12px 8px;max-height:30vh}
+  .card{padding:10px 12px}.eranote,.chips,.caveat{display:none}
+  .topmeta .disc{display:none}.topbar{padding:12px 12px 0}
+  .bottom{padding:0 10px 10px}.ctrl-wrap{padding:9px 10px}
+  .tl-foot{display:none}.track .yr-tick{font-size:8px}
+}
+</style>
+</head>
+<body>
+
+<canvas id="scene"></canvas>
+<div id="vignette"></div>
+<div id="labels"></div>
+<div id="shipTags"></div>
+<div id="hoverCard"></div>
+
+<div class="frame">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">✦</div>
+      <div>
+        <h1>大航海时代 <em>·</em> 逐年海图</h1>
+        <div class="sub">The Age of Discovery · Year-by-Year Atlas</div>
+      </div>
+    </div>
+    <div class="topmeta">
+      <span class="yr"><span id="hdYear">1405</span><em id="hdMonthTxt" style="font-style:normal;font-size:15px;letter-spacing:.1em;color:var(--gold-dim);margin-left:6px">一月</em></span>
+      <span id="hdStat">—</span>
+      <div class="disc">纲目：《透过地理看历史·大航海时代》（李不白，50 章）｜史实另据权威来源核查</div>
+    </div>
+  </header>
+
+  <nav class="left">
+    <div class="panel-label">纲目卷次 / Chapters</div>
+    <div class="card" id="eralist"></div>
+    <div class="panel-label">当前航行事件 / Voyages</div>
+    <div class="card"><div class="fleet" id="fleetlist"></div></div>
+    <div class="panel-label">海域与势力 / Legend</div>
+    <div class="card">
+      <div class="sec-t" style="margin-top:0">大气环流</div>
+      <div class="wstate" id="legWind">—</div>
+      <div class="sec-t">洋流</div>
+      <div class="leg" id="legCur"></div>
+      <div class="sec-t">势力范围</div>
+      <div class="leg" id="legPol"></div>
+      <div class="leg-note" id="legNote"></div>
+    </div>
+  </nav>
+
+  <aside class="right">
+    <div class="card" id="chronicle"></div>
+    <div class="card">
+      <div class="sec-t" style="margin-top:0">读图与史料边界</div>
+      <div class="caveat">
+        <b>迷雾</b>：按「该区域进入旧大陆／欧洲人地图记录的年份」逐块揭开。海岸先于内陆，
+        故美洲、非洲、澳洲的大片内陆与南极在本时段内始终为迷雾——这不是疏漏，史实如此。<br>
+        <b>航线</b>：相邻航点以球面大圆弧连接，仅作航路示意，非逐日实测航迹；标注「约」的月份用于时间轴排序。<br>
+        <b>环流</b>：风带与洋流是气候态示意——信风、西风带常年存在并随太阳直射点南北摆动，
+        印度洋与南海季风按月份反向；不是某一年的实测气象与海流。<br>
+        <b>势力</b>：色块是概化的势力所及，圆点为商站／要塞（据点而非领土），边界不构成条约界线；
+        同一地区先后易手者按年份切换，不叠加。<br>
+        <b>悬停</b>：把鼠标移到彩色船舶／旗帜图标上，可查看该队当前任务、探险成果与史料存疑。
+      </div>
+    </div>
+    <div class="card">
+      <div class="sec-t" style="margin-top:0">常见误解纠正 / Corrections</div>
+      <div class="corr" id="corrlist"></div>
+      <button class="toggle corr-more" id="btnCorr">展开全部</button>
+    </div>
+    <div class="card">
+      <div class="sec-t" style="margin-top:0">始终未揭开 / Terra Incognita</div>
+      <div class="chips" id="neverlist"></div>
+    </div>
+  </aside>
+
+  <footer class="bottom">
+    <div class="ctrl-wrap">
+      <div class="ctrl-top">
+        <button class="btn primary" id="btnPlay" title="播放 / 暂停 (空格)">
+          <svg viewBox="0 0 24 24"><path id="playIcon" d="M8 5v14l11-7z"/></svg>
+        </button>
+        <button class="btn" id="btnReplay" title="回到 1405 年">
+          <svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+        </button>
+        <div class="ctrl-divider"></div>
+        <select class="sel" id="selMonth" title="选择月份"></select>
+        <button class="toggle" id="btnSpeed">1 月/秒</button>
+        <div class="ctrl-divider"></div>
+        <button class="toggle on" id="btnFog">迷雾</button>
+        <button class="toggle on" id="btnWind">季风</button>
+        <button class="toggle on" id="btnCurrent">洋流</button>
+        <button class="toggle on" id="btnPowers">势力</button>
+        <button class="toggle" id="btnHistory">历史航迹</button>
+        <div class="ctrl-divider"></div>
+        <span class="seg-lb">地球</span>
+        <div class="seg" id="modeSeg">
+          <button data-mode="static" id="btnModeStatic">静止</button>
+          <button data-mode="spin" id="btnModeSpin" class="on">自转</button>
+          <button data-mode="follow" id="btnModeFollow">跟船</button>
+        </div>
+        <button class="toggle" id="btnReset">复位</button>
+        <div class="tl-now"><b id="tlYear">1405</b><span id="tlMonth">一月</span><small id="tlEra">卷一</small></div>
+      </div>
+      <div class="track" id="track">
+        <div class="rail"></div>
+        <div class="fill" id="trackFill"></div>
+        <div class="knob" id="knob"></div>
+      </div>
+      <div class="tl-foot">
+        <span id="tlHint">1405 — 1690 · 1 月/秒 推进 · 彩色横条为各探险队存续区间</span>
+        <span>拖拽旋转 · 滚轮缩放 · <kbd>空格</kbd> 播放 · <kbd>←</kbd><kbd>→</kbd> ±1 月 · <kbd>Shift</kbd>+<kbd>←</kbd> ±1 年</span>
+      </div>
+    </div>
+  </footer>
+</div>
+
+<div id="toast"></div>
+<div id="boot">正在绘制逐年海图 …</div>
+
+<script src="vendor/three.min.js"></script>
+<script src="data/land.js"></script>
+<script src="data/fog.js"></script>
+<script src="data/voyages.js"></script>
+<script src="data/expeditions.js"></script>
+<script src="data/expedition-meta.js"></script>
+<script src="data/earth-systems.js"></script>
+<script src="data/spheres.js"></script>
+<script src="js/fog.js"></script>
+<script src="js/powers.js"></script>
+<script src="js/climate.js"></script>
+<script src="js/globe.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
